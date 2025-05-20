@@ -1,8 +1,8 @@
-import cors from 'cors';
-import dotenv from 'dotenv';
-import express from 'express';
-import fetch from 'node-fetch';
-import { MongoClient, ServerApiVersion } from 'mongodb';
+const cors = require('cors');
+const dotenv = require('dotenv');
+const express = require('express');
+const fetch = require('node-fetch');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 // Load environment variables
 dotenv.config();
@@ -75,6 +75,42 @@ async function getMedibotResponse(userMessage) {
   }
 }
 
+async function getAIResponse(userMessage) {
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "http://localhost:2000",
+        "X-Title": "Chatbot",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "model": "deepseek/deepseek-r1:free",
+        "messages": [
+          {
+            "role": "user",
+            "content": userMessage
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("AI Response:", data);
+    
+    // Extract the AI's response content
+    return data.choices[0]?.message?.content || "I can not help you right now.";
+  } catch (error) {
+    console.error("Error getting AI response:", error);
+    throw error;
+  }
+}
+
 // Collections (uncomment when needed)
 // const userCollection = client.db("test").collection("users");
 // const placedProducts = client.db("test").collection("userAndProducts");
@@ -110,17 +146,23 @@ app.post("/webhook", async (req, res) => {
 
 
 
+
 async function handleMessage(event) {
   const senderId = event.sender.id;
   const message = event.message;
   
-  console.log(`Received message from ${senderId}:`, message.text);
-  
   try {
-    console.log("Processing message:", message.text);
     const response = await getMedibotResponse(message.text);
+
+    let aiResponse;
+    if(response.result){
+      aiResponse = await getAIResponse(`This is prompt: '${message.text}'; And this is response: '${response.result}'. I want you to make my response correct according to prompt. if you don't know the response is correct or not but seems like it can be correct then just give me the response in paragraph wise. But if you think the response is not correct then make the response correct according to prompt. Give me the response in paragraph wise. Let's take an example. Suppose the prompt is 'Hi' or 'Hello' but the response is not align with the prompt. Then you will just reply 'Hi, how can I assist you today?' or something like this. But if the response for the prompt is looks correct the give me the response only. Every time you will give me the response only in paragraph wise. Just check the response is correct or not.`);
+    }
+    
     // console.log("Chatbot response:", response.result);
-    await sendTextMessage(senderId, response.result);
+    if(aiResponse){
+      await sendTextMessage(senderId, aiResponse);
+    }
   } catch (error) {
     console.error('Failed to send reply:', error);
   }
@@ -181,6 +223,8 @@ app.get("/webhook", (req, res) => {
 app.get("/", async (req, res) => {
   
   try {
+    // const aiResponse = await getAIResponse('Hello');
+    // console.log("Chatbot response:", aiResponse);
     res.status(200).json({
       status: "Chatbot server is running successfully!",
     });
@@ -192,6 +236,35 @@ app.get("/", async (req, res) => {
     });
   }
 });
+
+
+
+async function keepAlive() {
+  try {
+    const response = await fetch('https://book-business-custom-chatbot.onrender.com', {
+      method: "GET",
+    });
+    
+    const data = await response.json(); // Use .text() if response is not JSON
+    // console.log(data?.status);
+  } catch (error) {
+    console.error('Error in keep-alive request:', error);
+  }
+}
+// Set up the interval (add this right before your server starts listening)
+const KEEP_ALIVE_INTERVAL = 10 * 1000; // 30 seconds in milliseconds
+const keepAliveInterval = setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
+
+
+process.on('SIGINT', () => {
+  clearInterval(keepAliveInterval);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+
 
 // Start Server
 const PORT = process.env.PORT || 2000;
