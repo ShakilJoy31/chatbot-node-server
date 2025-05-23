@@ -111,11 +111,6 @@ async function getAIResponse(userMessage) {
   }
 }
 
-// Collections (uncomment when needed)
-// const userCollection = client.db("test").collection("users");
-// const placedProducts = client.db("test").collection("userAndProducts");
-// const authentication = client.db("test").collection("authentication");
-
 // Webhook Handlers
 app.post("/webhook", async (req, res) => {
   let body = req.body;
@@ -153,16 +148,13 @@ async function handleMessage(event) {
   
   try {
     const response = await getMedibotResponse(message.text);
-
-    let aiResponse;
-    if(response.result){
-      aiResponse = await getAIResponse(`This is prompt: '${message.text}'; And this is response: '${response.result}'. I want you to make my response correct according to prompt. if you don't know the response is correct or not but seems like it can be correct then just give me the response in paragraph wise. But if you think the response is not correct then make the response correct according to prompt. Give me the response in paragraph wise. Let's take an example. Suppose the prompt is 'Hi' or 'Hello' but the response is not align with the prompt. Then you will just reply 'Hi, how can I assist you today?' or something like this. But if the response for the prompt is looks correct the give me the response only. Every time you will give me the response only in paragraph wise. Just check the response is correct or not.`);
-    }
-    
-    // console.log("Chatbot response:", response.result);
-    if(aiResponse){
-      await sendTextMessage(senderId, aiResponse);
-    }
+      await sendTextMessage(senderId, response.result);
+    // let aiResponse = await getAIResponse(`This is prompt: '${message.text}'; Reply the prompt shortly and specifically. Just return 'no' if you don't know the answer of of the prompt.`);
+    // if(aiResponse !== 'no'){
+    // } else {
+    //   const response = await getMedibotResponse(message.text);
+    //   await sendTextMessage(senderId, response.result);
+    // }
   } catch (error) {
     console.error('Failed to send reply:', error);
   }
@@ -236,34 +228,6 @@ app.get("/", async (req, res) => {
     });
   }
 });
-
-
-
-async function keepAlive() {
-  try {
-    const response = await fetch('https://book-business-custom-chatbot.onrender.com', {
-      method: "GET",
-    });
-    
-    const data = await response.json(); // Use .text() if response is not JSON
-    // console.log(data?.status);
-  } catch (error) {
-    console.error('Error in keep-alive request:', error);
-  }
-}
-// Set up the interval (add this right before your server starts listening)
-const KEEP_ALIVE_INTERVAL = 10 * 1000; // 30 seconds in milliseconds
-const keepAliveInterval = setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
-
-
-process.on('SIGINT', () => {
-  clearInterval(keepAliveInterval);
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
-
 
 
 // Start Server
