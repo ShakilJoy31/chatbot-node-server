@@ -218,7 +218,7 @@ app.get("/", async (req, res) => {
     // const aiResponse = await getAIResponse('Hello');
     // console.log("Chatbot response:", aiResponse);
     res.status(200).json({
-      status: "Chatbot server is running successfully!",
+      status: "Chatbot Node Server is running successfully!",
     });
   } catch (error) {
     console.error("Error in health check:", error);
@@ -228,6 +228,34 @@ app.get("/", async (req, res) => {
     });
   }
 });
+
+
+
+async function keepAlive() {
+  try {
+    const response = await fetch('https://book-business-custom-chatbot.onrender.com', {
+      method: "GET",
+    });
+    
+    const data = await response.json(); // Use .text() if response is not JSON
+    console.log(data);
+  } catch (error) {
+    console.error('Error in keep-alive request:', error);
+  }
+}
+// Set up the interval (add this right before your server starts listening)
+const KEEP_ALIVE_INTERVAL = 2 * 60 * 1000; // 30 seconds in milliseconds
+const keepAliveInterval = setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
+
+
+process.on('SIGINT', () => {
+  clearInterval(keepAliveInterval);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
 
 
 // Start Server
